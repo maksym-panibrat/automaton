@@ -721,14 +721,14 @@ echo "tests: secrets-block hook"
 mk_write() {
   # $1 = file_path; $2 = content
   jq -nc --arg p "$1" --arg c "$2" \
-    '{tool:"Write", tool_input:{file_path:$p, content:$c}}'
+    '{tool_name:"Write", tool_input:{file_path:$p, content:$c}}'
 }
 mk_edit() {
   jq -nc --arg p "$1" --arg c "$2" \
-    '{tool:"Edit", tool_input:{file_path:$p, new_string:$c}}'
+    '{tool_name:"Edit", tool_input:{file_path:$p, new_string:$c}}'
 }
 mk_bash() {
-  jq -nc --arg cmd "$1" '{tool:"Bash", tool_input:{command:$cmd}}'
+  jq -nc --arg cmd "$1" '{tool_name:"Bash", tool_input:{command:$cmd}}'
 }
 
 # Block: writing AWS key to a .ts file
@@ -788,7 +788,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib/secret-patterns.sh"
 
 payload="$(cat)"
-tool="$(jq -r '.tool // empty' <<<"$payload")"
+tool_name="$(jq -r '.tool_name // empty' <<<"$payload")"
 
 block() {
   printf 'BLOCKED by automaton/secrets-block: %s\n' "$1" >&2
@@ -807,7 +807,7 @@ scan_content() {
   fi
 }
 
-case "$tool" in
+case "$tool_name" in
   Write)
     path="$(jq -r '.tool_input.file_path // ""' <<<"$payload")"
     content="$(jq -r '.tool_input.content // ""' <<<"$payload")"
@@ -1101,12 +1101,15 @@ HOOK="$DIR/hooks/audit-log.sh"
 
 echo "tests: audit-log"
 
-# Synthetic PostToolUse payload (per Task A.4 schema).
+# Synthetic PostToolUse payload (per spec §17.3, verified 2026-04-25).
+# Note: duration_ms is top-level, not under tool_response. tool_response shape
+# is tool-specific; for Bash we leave it minimal.
 mk_post_bash() {
-  jq -nc --arg cmd "$1" --argjson exit "$2" --argjson dur "$3" '
-    {tool:"Bash",
+  jq -nc --arg cmd "$1" --argjson dur "$2" '
+    {tool_name:"Bash",
      tool_input:{command:$cmd},
-     tool_response:{stdout:"", stderr:"", exit_code:$exit, duration_ms:$dur}}'
+     tool_response:{stdout:"", stderr:"", success:true},
+     duration_ms:$dur}'
 }
 
 scratch="$(mktemp -d)"
@@ -1125,7 +1128,7 @@ EOF
 
 export AUTOMATON_AUDIT_DIR="$scratch/audit"
 
-P="$(mk_post_bash "pnpm test src/api/healthz.test.ts" 0 1240)"
+P="$(mk_post_bash "pnpm test src/api/healthz.test.ts" 1240)"
 printf '%s' "$P" | "$HOOK" >/dev/null
 
 today="$(date -u +%F)"
@@ -1134,15 +1137,14 @@ file="$AUTOMATON_AUDIT_DIR/maksym-panibratenko/foo/$today.jsonl"
 line="$(tail -1 "$file")"
 
 assert_eq "Bash"                     "$(jq -r .tool      <<<"$line")" "tool field"
-assert_eq "0"                        "$(jq -r .exit      <<<"$line")" "exit field"
-assert_eq "1240"                     "$(jq -r .duration_ms <<<"$line")" "duration field"
+assert_eq "1240"                     "$(jq -r .duration_ms <<<"$line")" "duration_ms field"
 assert_eq "verify"                   "$(jq -r .phase     <<<"$line")" "phase field"
 assert_eq "42"                       "$(jq -r .issue     <<<"$line")" "issue field"
 assert_eq "run-20260425-1432-foo-42" "$(jq -r .run_id    <<<"$line")" "run_id field"
 assert_eq "maksym-panibratenko/foo"  "$(jq -r .repo      <<<"$line")" "repo field"
 assert_match '^pnpm test'            "$(jq -r .cmd_summary <<<"$line")" "cmd_summary field"
 # cmd_summary is truncated to 80 chars
-P_LONG="$(mk_post_bash "$(printf 'echo %.0s' {1..200})" 0 12)"
+P_LONG="$(mk_post_bash "$(printf 'echo %.0s' {1..200})" 12)"
 printf '%s' "$P_LONG" | "$HOOK" >/dev/null
 last="$(tail -1 "$file")"
 len=$(jq -r '.cmd_summary | length' <<<"$last")
@@ -1151,7 +1153,7 @@ assert_eq "true" "$([[ "$len" -le 80 ]] && echo true || echo false)" "cmd_summar
 
 # When no run-state file exists, the hook must still succeed (silently no-op or write with empty fields).
 rm -f "$AUTOMATON_STATE_DIR/current-run.env"
-P2="$(mk_post_bash "ls" 0 5)"
+P2="$(mk_post_bash "ls" 5)"
 printf '%s' "$P2" | "$HOOK" >/dev/null
 assert_eq "0" "$?" "hook succeeds with no run state"
 
@@ -1180,17 +1182,17 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib/jsonl.sh"
 
 payload="$(cat)"
-tool="$(jq -r '.tool // empty' <<<"$payload")"
+tool_name="$(jq -r '.tool_name // empty' <<<"$payload")"
 
 # Only audit interesting tools; other PostToolUse payloads pass through silently.
-case "$tool" in
+case "$tool_name" in
   Bash|Edit|Write|Task) : ;;
   *) exit 0 ;;
 esac
 
 # Pull tool-specific summary
 cmd_summary=""
-case "$tool" in
+case "$tool_name" in
   Bash)  cmd_summary="$(jq -r '.tool_input.command // ""' <<<"$payload")" ;;
   Edit)  cmd_summary="edit $(jq -r '.tool_input.file_path // "?"' <<<"$payload")" ;;
   Write) cmd_summary="write $(jq -r '.tool_input.file_path // "?"' <<<"$payload")" ;;
@@ -1198,8 +1200,11 @@ case "$tool" in
 esac
 cmd_summary="${cmd_summary:0:80}"
 
-exit_code="$(jq -r '.tool_response.exit_code // 0' <<<"$payload")"
-duration_ms="$(jq -r '.tool_response.duration_ms // 0' <<<"$payload")"
+# Per spec §17.3, duration_ms is a top-level field (not under tool_response).
+# tool_response shape varies per tool; we capture .success when present (Write/Edit),
+# leave it null for Bash/Task where the schema differs.
+duration_ms="$(jq -r '.duration_ms // 0' <<<"$payload")"
+success="$(jq -rc '.tool_response.success // null' <<<"$payload")"
 
 run_state_load_env || true
 
@@ -1232,13 +1237,13 @@ event="$(jq -nc \
   --arg branch "$branch" \
   --arg sha "$sha" \
   --arg phase "$phase" \
-  --arg tool "$tool" \
+  --arg tool "$tool_name" \
   --arg cmd_summary "$cmd_summary" \
-  --argjson exit "$exit_code" \
+  --argjson success "$success" \
   --argjson duration_ms "$duration_ms" '
   {ts:$ts, run_id:$run_id, repo:$repo, issue:$issue,
    branch:$branch, sha:$sha, phase:$phase, tool:$tool,
-   cmd_summary:$cmd_summary, exit:$exit, duration_ms:$duration_ms}')"
+   cmd_summary:$cmd_summary, success:$success, duration_ms:$duration_ms}')"
 
 jsonl_append "$out_file" "$event"
 exit 0
@@ -1253,7 +1258,7 @@ chmod +x hooks/audit-log.sh
 ```bash
 bash tests/test-audit-log.sh
 ```
-Expected: `PASS 10 passed` (8 field checks + cmd_summary length + no-state-file run).
+Expected: `PASS 9 passed` (7 field checks + cmd_summary length + no-state-file run). The `exit` field assertion was dropped because `tool_response.exit_code` is not a documented PostToolUse key — see spec §17.8.
 
 - [ ] **Step 4: Lint**
 
@@ -1384,7 +1389,7 @@ HOOK="$DIR/hooks/pr-ready-gate.sh"
 echo "tests: pr-ready-gate"
 
 mk_pr_ready() {
-  jq -nc --arg cmd "$1" '{tool:"Bash", tool_input:{command:$cmd}}'
+  jq -nc --arg cmd "$1" '{tool_name:"Bash", tool_input:{command:$cmd}}'
 }
 
 scratch="$(mktemp -d)"
@@ -1480,9 +1485,9 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib/run-state.sh"
 
 payload="$(cat)"
-tool="$(jq -r '.tool // empty' <<<"$payload")"
+tool_name="$(jq -r '.tool_name // empty' <<<"$payload")"
 
-[[ "$tool" == "Bash" ]] || exit 0
+[[ "$tool_name" == "Bash" ]] || exit 0
 cmd="$(jq -r '.tool_input.command // ""' <<<"$payload")"
 case "$cmd" in
   "gh pr ready"*|*"gh pr ready"*) : ;;
