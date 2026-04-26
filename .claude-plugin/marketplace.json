@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "automaton",
+  "description": "Single-issue autonomous worker harness for Claude Code (self-hosted marketplace).",
+  "owner": {
+    "name": "Maksym Panibratenko",
+    "email": "maksym@panibrat.com"
+  },
+  "plugins": [
+    {
+      "name": "automaton",
+      "description": "Single-issue autonomous worker: pickup, dry-run interpretation, implementation, verification, PR — with halt-on-ambiguity and human-review-by-default.",
+      "category": "development",
+      "source": ".",
+      "homepage": "https://github.com/maksym-panibrat/automaton"
+    }
+  ]
+}
