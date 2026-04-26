@@ -1,0 +1,5 @@
+{
+  "number": 43,
+  "title": "Improve error handling in the auth flow",
+  "body": "## Goal\nMake auth more robust.\n\n## Acceptance criteria\n- [ ] Errors are handled\n\n## Verification\n```\npnpm test\n```\n"
+}

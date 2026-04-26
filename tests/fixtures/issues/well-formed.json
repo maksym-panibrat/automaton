@@ -1,0 +1,5 @@
+{
+  "number": 42,
+  "title": "Add /healthz endpoint",
+  "body": "## Goal\nReturn 200 OK from a new `/healthz` endpoint for liveness checks.\n\n## Acceptance criteria\n- [ ] `GET /healthz` returns 200 with body `{\"status\":\"ok\"}`\n- [ ] Existing tests still pass\n\n## Verification\n```\npnpm test src/api/healthz.test.ts\n```\n"
+}
