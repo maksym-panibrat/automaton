@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # hooks/pr-ready-gate.sh — PreToolUse hook on Bash. Blocks `gh pr ready ...`
 # unless the current run has both:
-#   1. A "Dry-run interpretation" PR comment whose body includes `Run ID: <run-id>`.
+#   1. A "Dry-run interpretation" reference on the PR (in the body OR any comment)
+#      whose text includes `Run ID: <run-id>`.
 #   2. An audit event with phase=verify, event=tests_passed, sha=<HEAD short sha>.
 
 set -euo pipefail
@@ -33,12 +34,14 @@ pr_number="${AUTOMATON_PR_NUMBER:-}"
 [[ -n "$repo" ]]   || block "no AUTOMATON_REPO in run state"
 [[ -n "$pr_number" ]] || block "no AUTOMATON_PR_NUMBER in run state (open the draft PR before running gh pr ready)"
 
-# Gate A: dry-run comment present
-comments_json="$(gh pr view "$pr_number" --repo "$repo" --json comments 2>/dev/null || echo '{"comments":[]}')"
-if ! grep -F "Run ID: \\\"$run_id\\\"" <<<"$comments_json" >/dev/null; then
-  if ! grep -F "Run ID: \`$run_id\`" <<<"$comments_json" >/dev/null; then
-    if ! grep -F "Run ID: $run_id" <<<"$comments_json" >/dev/null; then
-      block "PR has no dry-run interpretation comment for run $run_id"
+# Gate A: dry-run reference on the PR (body OR comments). The worker's Step 6
+# puts the dry-run interpretation in the PR body; users can also comment it.
+# Either location satisfies the gate so long as `Run ID: <run-id>` appears.
+pr_json="$(gh pr view "$pr_number" --repo "$repo" --json comments,body 2>/dev/null || echo '{"comments":[],"body":""}')"
+if ! grep -F "Run ID: \\\"$run_id\\\"" <<<"$pr_json" >/dev/null; then
+  if ! grep -F "Run ID: \`$run_id\`" <<<"$pr_json" >/dev/null; then
+    if ! grep -F "Run ID: $run_id" <<<"$pr_json" >/dev/null; then
+      block "PR has no dry-run interpretation reference (body or comments) for run $run_id"
     fi
   fi
 fi

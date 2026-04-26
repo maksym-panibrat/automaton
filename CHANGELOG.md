@@ -5,7 +5,15 @@ All notable changes to `automaton` are documented here. Format: [Keep a Changelo
 ## [Unreleased]
 
 ### Pending
-- L.5 (auto-merge gate positive path) acceptance walk. The negative path is validated implicitly — every test issue lacked `claude:auto-merge`, and the worker correctly defaulted to "open PR for human review" each time. The positive path (`claude:auto-merge` + green CI + diff matches a registered safe pattern → `gh pr merge --auto --squash`) needs a deps-bump-style fixture and a configured CI; deferred to v0.1.0.
+- L.5 (auto-merge gate positive path) acceptance walk.
+
+## [0.0.4] — 2026-04-25
+
+### Fixed
+- `hooks/pr-ready-gate.sh` now scans the PR body in addition to PR comments for the dry-run `Run ID: <id>` reference. The worker's `working-an-issue` Step 6 puts the dry-run interpretation in the PR *body* (per spec §4), but the gate previously queried only `gh pr view --json comments`, forcing the worker to manually re-post the interpretation as a comment to satisfy the gate. Now `gh pr view --json comments,body` is queried and either location passes. Surfaced by the v0.0.3 L.3 retry against `maksym-panibrat/automaton-acceptance#1` (PR #4).
+
+### Validated
+- L.3 acceptance retry: `/automaton:work-issue 1` ran cleanly through all 6 steps end-to-end. PR #4 opened draft → safety-spotter clean → both pr-ready gates satisfied (after the workaround above) → marked ready for review → completion comment posted → run state cleared.
 
 ## [0.0.3] — 2026-04-25
 
