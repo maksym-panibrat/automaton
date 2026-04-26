@@ -4,8 +4,11 @@ All notable changes to `automaton` are documented here. Format: [Keep a Changelo
 
 ## [Unreleased]
 
-### Pending
-- L.5 (auto-merge gate positive path) acceptance walk.
+### Validated
+- **L.5 acceptance (auto-merge gate, positive path):** `/automaton:work-issue 5` against `maksym-panibrat/automaton-acceptance#5` (a docs-only issue with `claude:auto-merge`) ran cleanly through all 6 steps. Auto-merge gate evaluated all three conditions: `claude:auto-merge` label present ✓, no required CI checks (vacuously green) ✓, diff matches `docs-only` pattern (only `README.md` changed) ✓ — `gh pr merge --auto --squash` invoked. PR #6 merged to `main` at commit `53ec12d`, issue #5 auto-closed via `Closes #5`, feature branch auto-deleted. Spec §14 acceptance criterion #9 satisfied.
+
+### Notes
+- Real-world install-state pitfall surfaced during the L.5 setup: when a project has multiple scope entries in `installed_plugins.json` (e.g., `local` from an earlier install + `project` from a later one), Claude Code's loader can pin to the older scope's stale `gitCommitSha` even when the manifest reports the newer version. Symptom: `/reload-plugins` reports the plugin enabled but loads zero contributions, and `/plugin install` reports "already at the latest version". Workaround: directly edit `~/.claude/plugins/installed_plugins.json` to remove the stale entry, and clear any `enabledPlugins.<plugin>: false` flags in the project's `.claude/settings.local.json` left behind by `/plugin uninstall`. Worth filing upstream against Claude Code.
 
 ## [0.0.4] — 2026-04-25
 
