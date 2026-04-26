@@ -100,8 +100,9 @@ The two worlds do not overlap. Local does production work. Cloud does cheap reac
 ### 3.2 Plugin contributions
 
 - **5 slash commands:** `/work-next`, `/work-issue`, `/show-activity`, `/dry-run`, `/scaffold`
-- **2 specialist agents:** `issue-interpreter` (Sonnet 4.6, 5 tools), `safety-spotter` (Haiku 4.5, 2 tools)
+- **1 specialist agent:** `issue-interpreter` (Sonnet 4.6, 5 tools). `safety-spotter` is a shell tool, not an agent — see §15.2.
 - **4 hooks:** `audit-log.sh`, `secrets-block.sh`, `pr-ready-gate.sh`, `session-start-summary.sh`
+- **1 shell tool:** `tools/safety-spotter.sh` (deterministic regex over the diff; shares `lib/secret-patterns.sh` with `secrets-block.sh`)
 - **2 skills:** `working-an-issue/SKILL.md`, `interpreting-an-issue/SKILL.md`
 - **2 templates:** `pr-review.yml`, `triage.yml`, plus `.claude-harness.toml`
 - **1 short CLAUDE.md** (~30 lines) and `settings.json` for hook wirings
@@ -147,7 +148,7 @@ Run the verification commands from the issue body. Quote actual stdout in a work
 
 - Push the branch.
 - Open a draft PR with the dry-run interpretation comment as the description (and link the issue with `Closes #NN`).
-- Run `safety-spotter` on the diff (Haiku regex check for secret patterns). If it fires, halt with `claude:blocked`.
+- Run `tools/safety-spotter.sh` on the diff (`git diff origin/main...HEAD`) — a deterministic shell regex check sharing the canary set with `secrets-block.sh`. If it fires, halt with `claude:blocked`.
 - If issue had `claude:auto-merge` AND CI is green AND diff matches a registered auto-merge-safe pattern (§7) → `gh pr merge --auto --squash`.
 - Otherwise: `gh pr ready` (mark for human review). Post the completion-summary comment.
 
@@ -480,13 +481,16 @@ automaton/
 │   ├── dry-run.md
 │   └── scaffold.md
 ├── agents/
-│   ├── issue-interpreter.md       # Sonnet 4.6, 5 tools
-│   └── safety-spotter.md          # Haiku 4.5, 2 tools
+│   └── issue-interpreter.md       # Sonnet 4.6, 5 tools
 ├── hooks/
 │   ├── audit-log.sh
 │   ├── secrets-block.sh
 │   ├── pr-ready-gate.sh
 │   └── session-start-summary.sh
+├── lib/
+│   └── secret-patterns.sh         # shared canary regex set
+├── tools/
+│   └── safety-spotter.sh          # diff-scoped regex check (Step 6)
 ├── skills/
 │   ├── working-an-issue/SKILL.md
 │   └── interpreting-an-issue/SKILL.md
@@ -572,17 +576,19 @@ The plugin is "v2 done" when:
 - [ ] Halt path: issue with deliberately ambiguous body produces `claude:blocked` label + structured comment, no code commits.
 - [ ] Total file count under ~35; total custom code under ~1500 LOC.
 
-## 15. Open questions deferred to implementation
+## 15. Open questions
+
+### 15.1 Still deferred to implementation
 
 - Exact `plugin.json` schema fields (depend on Claude Code plugin spec at time of build).
-- Whether `safety-spotter` is one Haiku call or just a shell regex pass (no LLM). If the regex covers all canaries reliably, drop the LLM call.
 - `.claude-harness.toml` parser — `tomllib` (Python) vs a small `jq`-based pattern. Decide during implementation.
-- Repo configuration for `/work-next`: where does the list of "configured repos" live? Options: a global `~/.claude/automaton.toml`, a `gh repo list` filter (e.g., `--label automaton-watch` on the *repo*, not the issue), or a per-machine env var.
-- When to push the `automaton` repo to GitHub (now for URL stability vs after v0.1).
 
-### 15.1 Resolved
+### 15.2 Resolved
 
 - **Repo decision (2026-04-25):** `automaton` lives in a fresh repo at `~/dev/automaton/`. The existing `panibrat-claude-harness` repo will be deprecated (not renamed in place).
+- **Configured-repos list (2026-04-25):** plain newline-delimited file at `~/.claude/automaton/repos`, one `owner/repo` per line, `#` comments allowed. Read by `/work-next` via `awk 'NF && !/^#/'`. Rejected: TOML/JSON (parser overkill for a flat list at this scale), `gh search --topic automaton-watch` (per-pickup network cost), env var (per-shell state is fragile). The per-repo `.claude-harness.toml` keeps its richer schema (auto-merge patterns).
+- **safety-spotter (2026-04-25):** pure shell regex, no LLM call. Implemented as `tools/safety-spotter.sh`, sharing the canary regex set with `hooks/secrets-block.sh` via a sourced `lib/secret-patterns.sh`. Removes the `agents/safety-spotter.md` LLM agent entirely (plugin contributions in §3.2 drop to **1 specialist agent**: `issue-interpreter`). Rationale: deterministic, zero API cost, same canary set already enumerated in `tests/test-secrets-block.sh`; if classes of secrets emerge that regex cannot catch, an LLM step can be reintroduced behind the same interface.
+- **GitHub push (2026-04-25):** push now as a public repo at `github.com/maksym-panibratenko/automaton`. Acceptance criterion §14[1] requires marketplace install (stable URL); `plugin.json.repository` needs a URL; implementation will exercise `/plugin install` against the live remote; portfolio framing benefits from visibility. Reversible (private toggle). Push action is staged after the implementation plan is produced.
 
 ## 16. Next step
 
