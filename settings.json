@@ -7,6 +7,14 @@
           { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/secrets-block.sh" }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|Task",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/audit-log.sh" }
+        ]
+      }
     ]
   }
 }
