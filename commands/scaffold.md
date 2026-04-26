@@ -19,7 +19,12 @@ Steps:
    cp "${CLAUDE_PLUGIN_ROOT}/templates/.github/workflows/triage.yml"     .github/workflows/
    cp "${CLAUDE_PLUGIN_ROOT}/templates/.claude/audit/.gitignore"          .claude/audit/.gitignore
    ```
-4. Append the repo to `~/.claude/automaton/repos` if not already listed:
+4. Ensure `.worktrees/` is git-ignored at the repo root. The worker uses `superpowers:using-git-worktrees` for branch isolation, which requires this. Without it, every first run has to make a side commit and then carry it into the feature branch — a real-world halt-cascade observed in the v0.0.2 acceptance walk.
+   ```bash
+   touch .gitignore
+   grep -qxF '.worktrees/' .gitignore || printf '\n# automaton worker isolation\n.worktrees/\n' >> .gitignore
+   ```
+5. Append the repo to `~/.claude/automaton/repos` if not already listed:
    ```bash
    repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
    mkdir -p "$HOME/.claude/automaton"

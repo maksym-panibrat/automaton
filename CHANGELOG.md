@@ -4,8 +4,23 @@ All notable changes to `automaton` are documented here. Format: [Keep a Changelo
 
 ## [Unreleased]
 
-### Deferred
-- End-to-end acceptance walkthrough against a live `automaton-acceptance` test repo (spec §14 items L.2–L.6).
+### Pending
+- L.4 (`/work-next` cross-repo pickup) and L.5 (auto-merge gate true/false paths) acceptance walks.
+
+## [0.0.3] — 2026-04-25
+
+### Fixed
+- `/automaton:scaffold` now adds `.worktrees/` to the target repo's `.gitignore`. Without this, the worker's first run on a new repo had to make a side commit ignoring `.worktrees/` (because `superpowers:using-git-worktrees` requires the directory to be ignored), which then bled into the feature branch and violated any `## Out of scope` constraint in the issue. Surfaced by the v0.0.2 acceptance walk against `maksym-panibrat/automaton-acceptance#1` — worker correctly halted via the spec §4 destructive-op gate.
+
+## [0.0.2] — 2026-04-25
+
+### Fixed
+- Plugin hooks now declared in `plugin.json` directly (per `code.claude.com/docs/en/plugin-marketplaces`). The standalone `settings.json` was never read by the plugin loader, so the four hooks did not register at install time. Removed `settings.json`.
+
+### Validated
+- L.2 acceptance: `/automaton:dry-run` against three issue shapes (well-formed, ambiguous, missing-sections) on `maksym-panibrat/automaton-acceptance` — comments posted, ambiguity scoring matches the spec §5.2 rubric.
+- L.3 acceptance (substantially): `/automaton:work-issue 1` ran Steps 1–5 cleanly, halted at Step 6 on the destructive-op gate (root cause: missing `.worktrees/` in `.gitignore`, fixed in 0.0.3).
+- L.6 acceptance: structured §9.1 blocked comment posted, `claude:in-progress` → `claude:blocked` swap, run state cleared. Validated incidentally via the L.3 halt above.
 
 ## [0.0.1] — 2026-04-25
 
