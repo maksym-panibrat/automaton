@@ -1,0 +1,15 @@
+# automaton per-repo configuration. See docs/superpowers/specs/2026-04-25-automaton-harness-design.md §7.1.
+
+[auto_merge]
+# Subset of: deps-bump, docs-only, generated, formatting.
+patterns = ["deps-bump", "docs-only", "formatting"]
+
+[auto_merge.generated]
+# Path globs (extended-glob) considered "generated" for the `generated` pattern.
+# Edit this list to match your repo's checked-in generated artifacts.
+globs = ["**/__snapshots__/**"]
+
+[verification]
+# Default verification command if an issue body omits the ## Verification block.
+# The worker will halt rather than guess; this is just a hint for the issue author.
+hint = "pnpm test"
