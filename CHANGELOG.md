@@ -2,13 +2,33 @@
 
 All notable changes to `automaton` are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.1.0] — 2026-04-25
 
-### Validated
-- **L.5 acceptance (auto-merge gate, positive path):** `/automaton:work-issue 5` against `maksym-panibrat/automaton-acceptance#5` (a docs-only issue with `claude:auto-merge`) ran cleanly through all 6 steps. Auto-merge gate evaluated all three conditions: `claude:auto-merge` label present ✓, no required CI checks (vacuously green) ✓, diff matches `docs-only` pattern (only `README.md` changed) ✓ — `gh pr merge --auto --squash` invoked. PR #6 merged to `main` at commit `53ec12d`, issue #5 auto-closed via `Closes #5`, feature branch auto-deleted. Spec §14 acceptance criterion #9 satisfied.
+First production-ready release. All spec §14 acceptance criteria validated end-to-end against `maksym-panibrat/automaton-acceptance` (private sandbox repo seeded with three issue fixtures + one auto-merge fixture).
 
-### Notes
-- Real-world install-state pitfall surfaced during the L.5 setup: when a project has multiple scope entries in `installed_plugins.json` (e.g., `local` from an earlier install + `project` from a later one), Claude Code's loader can pin to the older scope's stale `gitCommitSha` even when the manifest reports the newer version. Symptom: `/reload-plugins` reports the plugin enabled but loads zero contributions, and `/plugin install` reports "already at the latest version". Workaround: directly edit `~/.claude/plugins/installed_plugins.json` to remove the stale entry, and clear any `enabledPlugins.<plugin>: false` flags in the project's `.claude/settings.local.json` left behind by `/plugin uninstall`. Worth filing upstream against Claude Code.
+### Acceptance scoreboard
+
+- **9/11 criteria fully validated end-to-end:**
+  - L.1 `/plugin install` + 5 slash commands appear.
+  - L.2 `/dry-run` against well-formed (`score: 1`, proceed), ambiguous (`score: 3`, halt), and missing-sections (template-incomplete, halt-before-agent) issues.
+  - L.3 `/work-issue 1` ran the full 6-step contract → PR #4 ready for review.
+  - L.4 `/work-next` exercised cross-repo pickup, queue sort, race-claim, and halted on the ambiguous issue (#2) at the keystone gate.
+  - L.5 `/work-issue 5` (docs-only with `claude:auto-merge`) exercised the auto-merge positive path → PR #6 squash-merged at `53ec12d`, issue auto-closed, branch auto-deleted.
+  - L.6 halt path validated 3× (destructive-op gate, ambiguity gate, template-incomplete gate).
+  - All 4 hooks pass synthetic-event tests (41/41 in `tests/test-hooks.sh`).
+  - `secrets-block.sh` blocks all 9 canary patterns.
+  - Size budget held: 38 files, ~1500 LOC (spec target: ~35 files, <1500 LOC).
+- **2/11 unit-tested-only** (no live exercise yet): `/show-activity`, `/scaffold`.
+
+### Bugs surfaced and fixed during the walk
+
+- v0.0.2: hooks must be declared in `plugin.json`, not a standalone `settings.json` (the loader doesn't read the latter).
+- v0.0.3: `/automaton:scaffold` now adds `.worktrees/` to the target repo's `.gitignore` (closes the L.3-Step-6 destructive-op cascade).
+- v0.0.4: `pr-ready-gate.sh` scans PR body in addition to PR comments (the worker puts the dry-run interpretation in the body per spec §4).
+
+### Known platform issues (not automaton bugs)
+
+- Claude Code install-state pitfall: when a project has multiple scope entries in `installed_plugins.json` (e.g., `local` from an earlier install + `project` from a later one), the loader can pin to the older scope's stale `gitCommitSha` even when the manifest reports the newer version. Symptom: `/reload-plugins` reports the plugin enabled but loads zero contributions; `/plugin install` reports "already at the latest version". Workaround: directly edit `~/.claude/plugins/installed_plugins.json` to remove the stale entry, and clear any `enabledPlugins.<plugin>: false` left behind in `.claude/settings.local.json` by `/plugin uninstall`. Worth filing upstream.
 
 ## [0.0.4] — 2026-04-25
 
