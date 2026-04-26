@@ -1,7 +1,7 @@
 {
   "name": "automaton",
   "description": "Single-issue autonomous worker harness for Claude Code: pickup, dry-run interpretation, implementation, verification, PR — with halt-on-ambiguity and human-review-by-default.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": {
     "name": "Maksym Panibratenko",
     "email": "maksym@panibrat.com"
@@ -9,5 +9,29 @@
   "homepage": "https://github.com/maksym-panibrat/automaton",
   "repository": "https://github.com/maksym-panibrat/automaton",
   "license": "MIT",
-  "keywords": ["automation", "github-issues", "worker", "ci", "harness"]
+  "keywords": ["automation", "github-issues", "worker", "ci", "harness"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/secrets-block.sh" }]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pr-ready-gate.sh" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|Task",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/audit-log.sh" }]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-summary.sh" }]
+      }
+    ]
+  }
 }
