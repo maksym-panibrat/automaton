@@ -11,7 +11,10 @@
       "name": "automaton",
       "description": "Single-issue autonomous worker: pickup, dry-run interpretation, implementation, verification, PR — with halt-on-ambiguity and human-review-by-default.",
       "category": "development",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "maksym-panibrat/automaton"
+      },
       "homepage": "https://github.com/maksym-panibrat/automaton"
     }
   ]
