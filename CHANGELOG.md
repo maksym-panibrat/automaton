@@ -2,6 +2,11 @@
 
 All notable changes to `automaton` are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
+## [0.1.1] — 2026-04-26
+
+### Fixed
+- `.claude-plugin/marketplace.json` plugin `source` switched from `{source: "github", repo: "maksym-panibrat/automaton"}` to `"./"`. When the plugin lives in the same repo as its marketplace (the "self-hosted marketplace" shape), the loader silently fails to populate `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` — the directory mtime is touched by the install routine but no clone lands. `installed_plugins.json` records the install as successful and `/reload-plugins` reports the plugin enabled, but zero contributions load (no skills, no commands, no hooks). The empirical fix matches the official `claude-plugins-official` pattern: when a plugin is colocated with its marketplace, use a relative path (e.g. `agent-sdk-dev` uses `"./plugins/agent-sdk-dev"`). Automaton's `.claude-plugin/plugin.json` is at the repo root, so `"./"` is the correct value. Verified: cache populates with the full plugin tree; `/reload-plugins` jumps from "3 skills · 6 agents · 1 hook" (superpowers only) to "8 skills · 7 agents · 5 hooks" (superpowers + automaton's 5 skills, 1 agent, 4 hooks).
+
 ## [0.1.0] — 2026-04-25
 
 First production-ready release. All spec §14 acceptance criteria validated end-to-end against `maksym-panibrat/automaton-acceptance` (private sandbox repo seeded with three issue fixtures + one auto-merge fixture).

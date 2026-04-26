@@ -1,7 +1,7 @@
 {
   "name": "automaton",
   "description": "Single-issue autonomous worker harness for Claude Code: pickup, dry-run interpretation, implementation, verification, PR — with halt-on-ambiguity and human-review-by-default.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Maksym Panibratenko",
     "email": "maksym@panibrat.com"
