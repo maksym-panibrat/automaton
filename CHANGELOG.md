@@ -5,12 +5,15 @@ All notable changes to `automaton` are documented here. Format: [Keep a Changelo
 ## [Unreleased]
 
 ### Pending
-- L.4 (`/work-next` cross-repo pickup) and L.5 (auto-merge gate true/false paths) acceptance walks.
+- L.5 (auto-merge gate positive path) acceptance walk. The negative path is validated implicitly — every test issue lacked `claude:auto-merge`, and the worker correctly defaulted to "open PR for human review" each time. The positive path (`claude:auto-merge` + green CI + diff matches a registered safe pattern → `gh pr merge --auto --squash`) needs a deps-bump-style fixture and a configured CI; deferred to v0.1.0.
 
 ## [0.0.3] — 2026-04-25
 
 ### Fixed
 - `/automaton:scaffold` now adds `.worktrees/` to the target repo's `.gitignore`. Without this, the worker's first run on a new repo had to make a side commit ignoring `.worktrees/` (because `superpowers:using-git-worktrees` requires the directory to be ignored), which then bled into the feature branch and violated any `## Out of scope` constraint in the issue. Surfaced by the v0.0.2 acceptance walk against `maksym-panibrat/automaton-acceptance#1` — worker correctly halted via the spec §4 destructive-op gate.
+
+### Validated
+- L.4 acceptance: `/automaton:work-next` against `maksym-panibrat/automaton-acceptance` correctly read the configured-repos file, queried candidates, filtered by `claude:in-progress`/`claude:blocked` exclusions, sorted by priority then `createdAt ASC`, race-claimed `claude:in-progress`, and handed off to `automaton:working-an-issue`. The Step 3 keystone gate fired on the deliberately ambiguous fixture (#2): `ambiguity_score=3`, `complexity=large` — both halt conditions tripped, structured §5.3 comment posted, label swapped to `claude:blocked`, run state cleared. Validates cross-repo pickup logic + race-claim + halt path inside a real worker invocation.
 
 ## [0.0.2] — 2026-04-25
 
