@@ -1,0 +1,23 @@
+name: PR review
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-6
+          prompt: |
+            Review this PR against its linked issue's acceptance criteria.
+            Flag: correctness gaps, security issues in the diff, missing tests
+            for new behavior. Skip stylistic nits unless they affect behavior.
+            Bullet points, not essays. <=200 words.
