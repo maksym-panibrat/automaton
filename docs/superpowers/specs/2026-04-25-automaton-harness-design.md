@@ -577,8 +577,12 @@ The plugin is "v2 done" when:
 - Exact `plugin.json` schema fields (depend on Claude Code plugin spec at time of build).
 - Whether `safety-spotter` is one Haiku call or just a shell regex pass (no LLM). If the regex covers all canaries reliably, drop the LLM call.
 - `.claude-harness.toml` parser — `tomllib` (Python) vs a small `jq`-based pattern. Decide during implementation.
-- Repo configuration for `/work-next`: where does the list of "configured repos" live? Options: a global `~/.claude/automaton.toml`, a `gh repo list` filter (e.g., `--label claude:autonomous-watch` on the *repo*, not the issue), or a per-machine env var.
-- Whether the existing `panibrat-claude-harness` repo gets renamed to `automaton`, or `automaton` lives in a fresh repo and v1 is archived.
+- Repo configuration for `/work-next`: where does the list of "configured repos" live? Options: a global `~/.claude/automaton.toml`, a `gh repo list` filter (e.g., `--label automaton-watch` on the *repo*, not the issue), or a per-machine env var.
+- When to push the `automaton` repo to GitHub (now for URL stability vs after v0.1).
+
+### 15.1 Resolved
+
+- **Repo decision (2026-04-25):** `automaton` lives in a fresh repo at `~/dev/automaton/`. The existing `panibrat-claude-harness` repo will be deprecated (not renamed in place).
 
 ## 16. Next step
 
