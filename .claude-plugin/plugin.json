@@ -6,8 +6,8 @@
     "name": "Maksym Panibratenko",
     "email": "maksym@panibrat.com"
   },
-  "homepage": "https://github.com/maksym-panibratenko/automaton",
-  "repository": "https://github.com/maksym-panibratenko/automaton",
+  "homepage": "https://github.com/maksym-panibrat/automaton",
+  "repository": "https://github.com/maksym-panibrat/automaton",
   "license": "MIT",
   "keywords": ["automation", "github-issues", "worker", "ci", "harness"]
 }

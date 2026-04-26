@@ -13,7 +13,7 @@ A small, debuggable Claude Code plugin: a single-issue autonomous worker that pi
 ## Install
 
 ```sh
-/plugin install https://github.com/maksym-panibratenko/automaton
+/plugin install https://github.com/maksym-panibrat/automaton
 ```
 
 Then in any repo you want to operate on:
