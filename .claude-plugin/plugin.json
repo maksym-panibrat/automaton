@@ -1,0 +1,13 @@
+{
+  "name": "automaton",
+  "description": "Single-issue autonomous worker harness for Claude Code: pickup, dry-run interpretation, implementation, verification, PR — with halt-on-ambiguity and human-review-by-default.",
+  "version": "0.0.1",
+  "author": {
+    "name": "Maksym Panibratenko",
+    "email": "maksym@panibrat.com"
+  },
+  "homepage": "https://github.com/maksym-panibratenko/automaton",
+  "repository": "https://github.com/maksym-panibratenko/automaton",
+  "license": "MIT",
+  "keywords": ["automation", "github-issues", "worker", "ci", "harness"]
+}
