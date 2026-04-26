@@ -1,0 +1,20 @@
+name: Issue triage
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-haiku-4-5
+          prompt: |
+            Apply at most one priority:* (p0..p3) and one type:*
+            (feat|fix|chore|refactor|docs) label to this issue.
+            Do NOT apply claude:ready — that's human-only intent.
+            If the issue body is missing Goal or Acceptance criteria sections,
+            comment: "Spec template incomplete; see automaton/docs/issue-template.md".
