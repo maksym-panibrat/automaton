@@ -593,3 +593,233 @@ The plugin is "v2 done" when:
 ## 16. Next step
 
 Hand off to `superpowers:writing-plans` for the implementation plan.
+
+## 17. Hook payload reference (verified 2026-04-25)
+
+Source: `https://code.claude.com/docs/en/hooks` (canonical redirect from `https://docs.claude.com/en/docs/claude-code/hooks`, which 301s to the `code.claude.com` domain).
+
+---
+
+### 17.1 Common fields (all events)
+
+Every hook receives these fields on stdin regardless of event type:
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/Users/.../.claude/projects/.../00893aaf-19fa-41d2-8238-13269b9b3ca0.jsonl",
+  "cwd": "/Users/my-project",
+  "permission_mode": "default|plan|acceptEdits|auto|dontAsk|bypassPermissions",
+  "hook_event_name": "PreToolUse",
+  "agent_id": "string (optional, subagent only)",
+  "agent_type": "string (optional, subagent only)"
+}
+```
+
+---
+
+### 17.2 PreToolUse payload
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/Users/.../.claude/projects/.../00893aaf.jsonl",
+  "cwd": "/Users/my-project",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_use_id": "toolu_01ABC123...",
+  "tool_input": {
+    // Tool-specific — see per-tool schemas below
+  }
+}
+```
+
+Key `tool_input` sub-schemas used by automaton hooks:
+
+| Tool   | Relevant keys in `tool_input`                                  |
+|--------|----------------------------------------------------------------|
+| `Bash` | `command` (string), `description` (string, opt), `timeout` (int, opt), `run_in_background` (bool, opt) |
+| `Write`| `file_path` (string), `content` (string)                       |
+| `Edit` | `file_path` (string), `old_string` (string), `new_string` (string), `replace_all` (bool, opt) |
+| `Read` | `file_path` (string), `offset` (int, opt), `limit` (int, opt)  |
+
+---
+
+### 17.3 PostToolUse payload
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/Users/.../.claude/projects/.../00893aaf.jsonl",
+  "cwd": "/Users/my-project",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_use_id": "toolu_01ABC123...",
+  "duration_ms": 12,
+  "tool_input": {
+    "file_path": "/path/to/file.txt",
+    "content": "file content"
+  },
+  "tool_response": {
+    "filePath": "/path/to/file.txt",
+    "success": true
+  }
+}
+```
+
+**Important:** `duration_ms` is a **top-level** field, not nested under `tool_response`. See Plan reconciliation (§17.7) for details.
+
+---
+
+### 17.4 SessionStart payload
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/Users/.../.claude/projects/.../00893aaf.jsonl",
+  "cwd": "/Users/my-project",
+  "hook_event_name": "SessionStart",
+  "source": "startup|resume|clear|compact",
+  "model": "claude-sonnet-4-6"
+}
+```
+
+Note: `SessionStart` does **not** include `permission_mode` in the common fields (it fires before the session's permission mode is established).
+
+---
+
+### 17.5 Exit-code semantics
+
+#### PreToolUse
+| Exit code | Behavior |
+|-----------|----------|
+| `0`       | Tool call proceeds. Any JSON stdout is processed for `permissionDecision` / `updatedInput` / `additionalContext`. |
+| `2`       | Tool call **blocked**. stderr is shown to Claude as the reason. |
+| Other     | Non-blocking error. stderr shown to user in transcript; execution continues. |
+
+#### PostToolUse
+| Exit code | Behavior |
+|-----------|----------|
+| `0`       | Success. JSON stdout processed; `additionalContext` injected if present. |
+| `2`       | Blocking error. stderr is shown to **Claude** (tool already ran). |
+| Other     | Non-blocking error. stderr shown to Claude; execution continues. |
+
+#### SessionStart
+| Exit code | Behavior |
+|-----------|----------|
+| `0`       | Success. Plain stdout or JSON `additionalContext` added to Claude's context. |
+| `2`       | Blocking error. stderr shown to **user only**; session still starts. |
+| Other     | Non-blocking error. stderr shown to user; full error in debug log. |
+
+**Key distinction:** Exit 2 on `PreToolUse` blocks the tool. Exit 2 on `PostToolUse`/`SessionStart` does NOT block — the tool already ran / the session already started; exit 2 only controls where stderr surfaces.
+
+---
+
+### 17.6 Matcher syntax
+
+Matchers live in `settings.json` under `hooks[].matcher`. The evaluation rule:
+
+| Matcher value | Evaluated as | Example |
+|---------------|-------------|---------|
+| `"*"`, `""`, or omitted | Match all | — |
+| Only `[A-Za-z0-9_|]` chars | Exact string or `\|`-separated list | `Bash`, `Edit\|Write` |
+| Any other character present | JavaScript regex | `^Notebook`, `mcp__memory__.*` |
+
+For `PreToolUse` / `PostToolUse` the matcher is compared against `tool_name`. Examples:
+
+```json
+"matcher": "Bash"               // exact match
+"matcher": "Write|Edit"         // pipe-separated list (no regex)
+"matcher": "Write|Edit|Bash"    // three tools
+"matcher": "^Notebook"          // regex prefix
+"matcher": "mcp__memory__.*"    // all tools from a named MCP server
+```
+
+For `SessionStart` the matcher is compared against `source` (`startup`, `resume`, `clear`, `compact`).
+
+There is also an **`if` field** (separate from `matcher`) that uses permission-rule syntax `ToolName(pattern)` and is evaluated only on tool events. Hook runs only when the `if` expression matches. This is in addition to — not a replacement for — the `matcher`.
+
+---
+
+### 17.7 hookSpecificOutput schemas
+
+#### PreToolUse output (stdout, exit 0)
+
+```json
+{
+  "continue": true,
+  "suppressOutput": false,
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow|deny|ask|defer",
+    "permissionDecisionReason": "Shown to user (allow/ask) or to Claude (deny)",
+    "updatedInput": { /* modified tool_input fields */ },
+    "additionalContext": "string added to Claude context"
+  }
+}
+```
+
+Decision precedence: `deny` > `defer` > `ask` > `allow`.
+
+To **block** a tool call: either exit 2 (stderr as reason), or exit 0 with `permissionDecision: "deny"` (reason via `permissionDecisionReason`).
+
+#### PostToolUse output (stdout, exit 0)
+
+```json
+{
+  "decision": "block",
+  "reason": "Shown to Claude if decision is block",
+  "continue": true,
+  "suppressOutput": false,
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "string",
+    "updatedMCPToolOutput": "string (MCP tools only)"
+  }
+}
+```
+
+#### SessionStart output (stdout, exit 0)
+
+```json
+{
+  "continue": true,
+  "suppressOutput": false,
+  "systemMessage": "optional string",
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "string — concatenated from all SessionStart hooks"
+  }
+}
+```
+
+---
+
+### 17.8 Plan reconciliation
+
+The implementation plan (Tasks C.3, D.2, E.2, F.1) assumed several field names and semantics. Verified status:
+
+| Plan assumption | Verified field / behavior | Status |
+|-----------------|---------------------------|--------|
+| `tool` (top-level key for tool name) | Actual key is **`tool_name`** | **DIVERGENCE** — tasks must use `.tool_name`, not `.tool` |
+| `tool_input.file_path` | `tool_input.file_path` ✓ | Confirmed |
+| `tool_input.content` | `tool_input.content` ✓ | Confirmed |
+| `tool_input.new_string` | `tool_input.new_string` ✓ | Confirmed |
+| `tool_input.command` | `tool_input.command` ✓ | Confirmed |
+| `tool_response.exit_code` | `tool_response` shape is tool-specific; for `Write` it is `{"filePath":"...", "success": true}`. **No `exit_code` field** in the documented `PostToolUse` payload. | **DIVERGENCE** — `exit_code` is not a documented `tool_response` key; audit-log hook must not rely on it |
+| `tool_response.duration_ms` | `duration_ms` exists but is a **top-level** field in `PostToolUse`, not nested under `tool_response` | **DIVERGENCE** — use `.duration_ms` (top-level), not `.tool_response.duration_ms` |
+| `source` field on SessionStart | `source: "startup\|resume\|clear\|compact"` ✓ | Confirmed |
+| SessionStart output: `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"..."}}` | Schema confirmed ✓ | Confirmed |
+| PreToolUse blocking via exit non-zero (plan uses exit 2) | Exit 2 blocks the tool call ✓ | Confirmed |
+| settings.json matcher uses tool-name regex like `Write\|Edit\|Bash` | Pipe-separated list without other special chars = exact-match list (not regex), but works as intended ✓ | Confirmed (exact-match list, not regex, but achieves same result) |
+
+**Summary of required adjustments for subsequent tasks:**
+
+1. **All hooks:** Replace `.tool` with `.tool_name` when reading the tool name from stdin JSON.
+2. **audit-log hook (Task D.2 / E.2):** Remove any reference to `.tool_response.exit_code` — this field does not exist in the documented schema. Record `.tool_response.success` (boolean) for `Write`/`Edit`, or parse `.tool_response` as-is for other tools. The hook may safely log the raw `tool_response` object.
+3. **audit-log hook (Task D.2 / E.2):** Change `.tool_response.duration_ms` → `.duration_ms` (top-level).
+4. **secrets-block hook (Task C.3):** No changes needed — it reads `.tool_input.command`, `.tool_input.content`, `.tool_input.new_string`, and exits 2 to block. All confirmed.
+5. **pr-ready-gate hook (Task F.1):** Reads `tool_name` and `tool_input.command`. Change `.tool` → `.tool_name`. Exit 2 semantics confirmed.
+6. **session-start-summary hook (Task E.2 / wherever assigned):** `additionalContext` under `hookSpecificOutput.hookEventName: "SessionStart"` confirmed.
